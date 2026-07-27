@@ -24,16 +24,14 @@ import razorpay
 # 1. LOAD ENVIRONMENT FIRST
 load_dotenv() 
 
-import re
-from google import genai
-from google.genai import types
-
 # 1. Initialize Gemini AI Client safely
 client = None
 chat_session = None
 gemini_key = os.getenv("GEMINI_API_KEY")
 if gemini_key:
     try:
+        from google import genai
+        from google.genai import types
         client = genai.Client(api_key=gemini_key)
         chat_session = client.chats.create(
             model="gemini-2.5-flash",
