@@ -106,6 +106,29 @@ app.add_middleware(
 # Initialize Database Tables
 Base.metadata.create_all(bind=engine)
 
+def seed_default_admin():
+    db = SessionLocal()
+    try:
+        admin_user = db.query(User).filter(User.role == "admin").first()
+        if not admin_user:
+            hashed_pw = pwd_context.hash("admin123")
+            new_admin = User(
+                username="admin",
+                email="admin@crave.com",
+                hashed_password=hashed_pw,
+                role="admin"
+            )
+            db.add(new_admin)
+            db.commit()
+            print("[DB Seed] Default admin created: username=admin, password=admin123")
+    except Exception as e:
+        print(f"[DB Seed Error]: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+seed_default_admin()
+
 app.include_router(restaurant.router)
 app.include_router(admin.router)
 app.include_router(menu.router)
