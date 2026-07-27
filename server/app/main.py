@@ -1,3 +1,11 @@
+import sys
+import os
+
+# Ensure server directory is in sys.path for Uvicorn imports on Render
+SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if SERVER_DIR not in sys.path:
+    sys.path.insert(0, SERVER_DIR)
+
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks, Response
 from fastapi.responses import RedirectResponse
@@ -8,7 +16,6 @@ from sqlalchemy import func
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
-import os
 import json
 import base64 
 import httpx
