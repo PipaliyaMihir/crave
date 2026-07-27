@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/login/login.jsx";
 import Home from "./pages/Home.jsx";
@@ -16,6 +16,7 @@ import ContactUs from "./pages/ContactUs.jsx";
 import { ToastProvider } from "./context/ToastContext";
 import Toast from "./components/Toast";
 import Chatbot from "./components/Chatbot.jsx";
+import ScrollToTop from "./components/ScrollToTop.jsx";
 
 // --- PROTECTED ROUTE WRAPPER ---
 const ProtectedRoute = ({ role, children }) => {
@@ -28,31 +29,29 @@ const ProtectedRoute = ({ role, children }) => {
   return children;
 };
 
-
 function App() {
   return (
     <ToastProvider>
       <BrowserRouter>
+        <ScrollToTop />
         <Toast />
         <Chatbot />
-        {/* <Navbar /> */}
         <Routes>
           <Route element={<MainLayout />}>
             {/* --- PUBLIC ROUTES --- */}
             <Route path="/" element={<Home />} />
-            {/* <Route path="/home"  */}
             <Route path="/about" element={<About />} />
             <Route path="/Contact-us" element={<ContactUs />} />
 
             {/* Public Restaurant Listing */}
             <Route path="/rest" element={<RestaurantsList />} />
             <Route path="/rest/:id" element={<RestaurantDetails />} />
-            <Route path="/menu-item/:id" element={<FoodItemDetails />} /> {/* Add this line */}
+            <Route path="/menu-item/:id" element={<FoodItemDetails />} />
 
             <Route path="/track-order" element={<TrackOrder />} />
-            {/* <Route path="/order-food" element={<OrderFood />} /> */}
             <Route path="/login" element={<Login />} />
           </Route>
+
           {/* --- PROTECTED: ADMIN --- */}
           <Route
             path="/admin/dashboard"
@@ -81,6 +80,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/rider/dashboard"
             element={
@@ -89,7 +89,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
         </Routes>
       </BrowserRouter>
     </ToastProvider>

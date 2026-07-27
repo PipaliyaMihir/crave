@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Star, Clock, Flame, Check, Minus, Plus, ShoppingBag, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
-import api from "../services/api";
+import api, { API_BASE_URL } from "../services/api";
 import { useToast } from "../context/useToast";
 
 const FoodItemDetails = () => {
@@ -63,7 +63,7 @@ const FoodItemDetails = () => {
     const getImageUrl = (itm) => {
         if (!itm) return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=80";
         if (itm.image && (itm.image.startsWith("data:") || itm.image.startsWith("http"))) return itm.image;
-        return `http://localhost:8000/api/menu/image/${itm.id}`;
+        return `${API_BASE_URL}/api/menu/image/${itm.id}`;
     };
 
     const availableAddons = useMemo(() => {

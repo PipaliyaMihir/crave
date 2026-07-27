@@ -262,6 +262,7 @@ import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, MapPin, ReceiptText } 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '../context/useToast';
 import CheckoutModal from './CheckoutModal';
+import { API_BASE_URL } from '../services/api';
 
 const Cart = ({ isOpen, onClose, cartItems = [], onUpdate }) => {
   const { addToast } = useToast();
@@ -289,7 +290,7 @@ const Cart = ({ isOpen, onClose, cartItems = [], onUpdate }) => {
       if (!token) return;
 
       try {
-        const response = await fetch('http://localhost:8000/api/users/me', {
+        const response = await fetch(`${API_BASE_URL}/api/users/me`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (response.ok) {
@@ -320,7 +321,7 @@ const Cart = ({ isOpen, onClose, cartItems = [], onUpdate }) => {
 
     setIsUpdating(true);
     try {
-      const response = await fetch('http://localhost:8000/api/update-address', {
+      const response = await fetch(`${API_BASE_URL}/api/update-address`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ address: address })
@@ -337,7 +338,7 @@ const Cart = ({ isOpen, onClose, cartItems = [], onUpdate }) => {
 
     setIsSaving(true);
     try {
-      const response = await fetch('http://localhost:8000/api/update-address', {
+      const response = await fetch(`${API_BASE_URL}/api/update-address`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ address: address })

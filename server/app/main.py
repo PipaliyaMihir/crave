@@ -1,5 +1,6 @@
-﻿from typing import List, Optional
+from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks, Response
+from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, defer, load_only
@@ -50,6 +51,7 @@ from app.models.rider_request import RiderRequest
 from app.models.rider import Rider # <--- MOVED TO TOP TO FIX CRASH
 from app.models.cart import Cart  # <--- ADDED IMPORT
 from app.models.contact import ContactInquiry
+from app.utils.cloudinary_utils import upload_image_to_cloudinary
 
 #  For location
 # --- WEBSOCKET IMPORT ---
@@ -865,12 +867,32 @@ def get_all_restaurants(db: Session = Depends(get_db)):
 @app.get("/api/restaurant/image/{restaurant_id}")
 def get_restaurant_image(restaurant_id: int, db: Session = Depends(get_db)):
     res = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
-    if not res or not res.profile_image: return Response(status_code=404)
+    if not res or not res.profile_image:
+        return Response(status_code=404)
+    
+    img_str = str(res.profile_image).strip()
+    if img_str.startswith("http://") or img_str.startswith("https://"):
+        return RedirectResponse(url=img_str, status_code=307)
+
     try:
-        img_str = res.profile_image
-        if "base64," in img_str: _, img_str = img_str.split("base64,", 1)
-        return Response(content=base64.b64decode(img_str), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=31536000"})
-    except: return Response(status_code=500)
+        media_type = "image/jpeg"
+        if img_str.startswith("data:"):
+            header, img_str = img_str.split(",", 1)
+            if "image/png" in header:
+                media_type = "image/png"
+            elif "image/webp" in header:
+                media_type = "image/webp"
+        elif "base64," in img_str:
+            _, img_str = img_str.split("base64,", 1)
+
+        return Response(
+            content=base64.b64decode(img_str),
+            media_type=media_type,
+            headers={"Cache-Control": "public, max-age=31536000"}
+        )
+    except Exception as e:
+        print(f"[Restaurant Image Error for id {restaurant_id}]: {e}")
+        return Response(status_code=404)
 
 @app.get("/restaurants/{restaurant_id}")
 def get_restaurant_detail(restaurant_id: int, db: Session = Depends(get_db)):
@@ -1231,10 +1253,10 @@ async def update_restaurant_profile(bg_tasks: BackgroundTasks, name: str = Form(
         if user: user.hashed_password = hashed
         res.password = hashed
     if profile_image:
-        content = await profile_image.read()
-        encoded = f"data:{profile_image.content_type};base64,{base64.b64encode(content).decode('utf-8')}"
-        res.profile_image = encoded
-        if user: user.profile_image = encoded
+        image_url = upload_image_to_cloudinary(profile_image, folder="crave_profiles")
+        if image_url:
+            res.profile_image = image_url
+            if user: user.profile_image = image_url
     db.commit()
     bg_tasks.add_task(send_update_email, email, name, username, address, password, res.profile_image)
     return {"message": "Profile updated", "profile_image": res.profile_image}
@@ -1652,61 +1674,74 @@ def add_to_cart(request: CartRequest, db: Session = Depends(get_db)):
 
 @app.get("/users/{user_id}/recommendations", response_model=list[MenuItemResponse])
 def get_user_recommendations(user_id: int, db: Session = Depends(get_db)):
-    # 1. Query the user's specific most frequently ordered items
-    user_top_query = (
-        db.query(MenuItem.id)
+    # 1. Recommendations ONLY show after at least one order is completed
+    user_orders = db.query(Order).filter(Order.user_id == user_id).all()
+    if not user_orders:
+        return []
+
+    # 2. Get past ordered items for this user
+    past_order_items = (
+        db.query(MenuItem)
         .join(OrderItem, OrderItem.menu_item_id == MenuItem.id)
         .join(Order, Order.id == OrderItem.order_id)
-        .filter(Order.user_id == user_id)
-        .group_by(MenuItem.id)
-        .order_by(func.count(OrderItem.id).desc())
-        .limit(3)
+        .filter(Order.user_id == user_id, MenuItem.is_available == True)
+        .order_by(OrderItem.id.desc())
+        .all()
     )
-    user_top_ids = [item_id for (item_id,) in user_top_query.all()]
-    
-    # Get the actual objects for the user's past orders
-    recommended_items = []
-    if user_top_ids:
-        recommended_items = db.query(MenuItem).filter(MenuItem.id.in_(user_top_ids)).all()
 
-    # 2. DYNAMIC FALLBACK: If they ordered less than 3 items, fill slots with MOST POPULAR items!
-    if len(recommended_items) < 3:
-        needed_items = 3 - len(recommended_items)
-        
-        # Query the OrderItem table to find what other users order the most
-        popular_items_query = (
-            db.query(MenuItem)
-            .join(OrderItem, OrderItem.menu_item_id == MenuItem.id)
-            .filter(MenuItem.is_available == True)
+    if not past_order_items:
+        return []
+
+    recommended_items = []
+    recommended_ids = set()
+
+    # Slot 1: Item from user's first/past completed order
+    first_order_item = past_order_items[0]
+    recommended_items.append(first_order_item)
+    recommended_ids.add(first_order_item.id)
+
+    # Slot 2: Similar product from the SAME category
+    similar_category_item = (
+        db.query(MenuItem)
+        .filter(
+            MenuItem.category == first_order_item.category,
+            MenuItem.is_available == True,
+            MenuItem.id.notin_(recommended_ids)
         )
-        
-        # Make sure we don't recommend something they already bought
-        if user_top_ids:
-            popular_items_query = popular_items_query.filter(MenuItem.id.notin_(user_top_ids))
-            
-        # Group by the item and sort by how many times it has been ordered globally
-        popular_items = (
-            popular_items_query
-            .group_by(MenuItem.id)
-            .order_by(func.count(OrderItem.id).desc())
-            .limit(needed_items)
+        .first()
+    )
+    if similar_category_item:
+        recommended_items.append(similar_category_item)
+        recommended_ids.add(similar_category_item.id)
+
+    # Slot 3: Product from ANOTHER category
+    other_category_item = (
+        db.query(MenuItem)
+        .filter(
+            MenuItem.category != first_order_item.category,
+            MenuItem.is_available == True,
+            MenuItem.id.notin_(recommended_ids)
+        )
+        .first()
+    )
+    if other_category_item:
+        recommended_items.append(other_category_item)
+        recommended_ids.add(other_category_item.id)
+
+    # Fallback to reach 3 items if needed
+    if len(recommended_items) < 3:
+        needed = 3 - len(recommended_items)
+        extra_items = (
+            db.query(MenuItem)
+            .filter(
+                MenuItem.is_available == True,
+                MenuItem.id.notin_(recommended_ids)
+            )
+            .limit(needed)
             .all()
         )
-        
-        recommended_items.extend(popular_items)
-        
-        # 3. ULTIMATE FALLBACK: If your app is brand new and NO ONE has ordered anything yet, 
-        # just grab available items so the screen is never blank.
-        if len(recommended_items) < 3:
-            still_needed = 3 - len(recommended_items)
-            current_ids = [item.id for item in recommended_items]
-            brand_new_items = db.query(MenuItem).filter(
-                MenuItem.is_available == True,
-                MenuItem.id.notin_(current_ids)
-            ).limit(still_needed).all()
-            
-            recommended_items.extend(brand_new_items)
-        
+        recommended_items.extend(extra_items)
+
     return recommended_items
     
 if __name__ == "__main__":

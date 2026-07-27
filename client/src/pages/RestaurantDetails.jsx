@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import api from "../services/api";
+import api, { API_BASE_URL } from "../services/api";
 import {
   ArrowLeft, Star, Search, Plus, Minus,
   CheckCircle, AlertCircle, Heart, MapPin, UtensilsCrossed, ChevronRight, X, Loader2
@@ -14,7 +14,7 @@ const getImageUrl = (item) => {
     return item.image;
   }
   // Automatically fetch from backend API if no direct image string is provided
-  return `http://localhost:8000/api/menu/image/${item.id}?t=${new Date().getTime()}`;
+  return `${API_BASE_URL}/api/menu/image/${item.id}?t=${new Date().getTime()}`;
 };
 
 // --- TOAST COMPONENT ---

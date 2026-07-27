@@ -181,10 +181,10 @@ import b1 from '/b1.png';
 import b2 from '/b2.png';
 import b3 from '/b3.png';
 import Recommended from '../components/Recommended';
-import PopularCategories from '../components/PopularCategories';
 import PopularBrand from '../components/PopularBrand';
 import Ad from '../components/ad';
 import Partner from '../components/partner';
+import { API_BASE_URL } from '../services/api';
 
 const Home = () => {
     const navigate = useNavigate();
@@ -212,7 +212,7 @@ const Home = () => {
             }
 
             try {
-                const response = await fetch('http://localhost:8000/api/orders/track', {
+                const response = await fetch(`${API_BASE_URL}/api/orders/track`, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Cache-Control': 'no-cache'
@@ -294,10 +294,8 @@ const Home = () => {
                 </div>
             </main>
 
-            {/* --- ADDED: Pass the loggedInUserId to the component --- */}
             <Recommended userId={loggedInUserId} />
 
-            <PopularCategories />
             <PopularBrand />
             <Ad />
             <Partner />

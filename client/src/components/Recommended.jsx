@@ -190,6 +190,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { API_BASE_URL } from '../services/api';
 
 const Recommended = ({ userId }) => {
     const [deals, setDeals] = useState([]);
@@ -198,40 +200,29 @@ const Recommended = ({ userId }) => {
     // Initialize the navigation hook
     const navigate = useNavigate();
 
-    // --- NETWORK OFFLINE FALLBACK ---
-    // This ONLY shows if the FastAPI server completely crashes or goes offline
-    const fallbackDeals = [
-        {
-            id: 'static-1', discount: "-40%", name: "Chef Burgers London", category: "Restaurant",
-            image: "https://images.unsplash.com/photo-1561758033-d89a9ad46330?auto=format&fit=crop&q=80&w=800",
-        },
-        {
-            id: 'static-2', discount: "-20%", name: "Grand Ai Cafe London", category: "Restaurant",
-            image: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=800",
-        },
-        {
-            id: 'static-3', discount: "-17%", name: "Butterbrot Caf'e London", category: "Restaurant",
-            image: "https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?auto=format&fit=crop&q=80&w=800",
-        },
-    ];
-
     useEffect(() => {
         const fetchRecommendations = async () => {
+            if (!userId) {
+                setDeals([]);
+                setLoading(false);
+                return;
+            }
             try {
-                const response = await axios.get(`http://localhost:8000/users/${userId}/recommendations`);
-                setDeals(response.data);
+                const response = await axios.get(`${API_BASE_URL}/users/${userId}/recommendations`);
+                if (Array.isArray(response.data)) {
+                    setDeals(response.data);
+                } else {
+                    setDeals([]);
+                }
             } catch (error) {
-                console.error("API Error: Server offline. Using static fallback data.");
+                console.error("API Error fetching recommendations:", error);
+                setDeals([]);
             } finally {
                 setLoading(false);
             }
         };
 
-        if (userId) {
-            fetchRecommendations();
-        } else {
-            setLoading(false);
-        }
+        fetchRecommendations();
     }, [userId]);
 
     const calculateDiscount = (price, discountPrice) => {
@@ -240,9 +231,10 @@ const Recommended = ({ userId }) => {
         return `-${percentage}%`;
     };
 
-    // --- DECISION ENGINE ---
-    // Just use whatever the API gives us! (Backend now guarantees 3 items)
-    const displayDeals = deals.length > 0 ? deals : fallbackDeals;
+    // If loading finished and user has no completed orders/recommendations, hide section
+    if (!loading && deals.length === 0) {
+        return null;
+    }
 
     return (
         <section className="w-[95%] mx-auto py-12 bg-white">
@@ -263,7 +255,7 @@ const Recommended = ({ userId }) => {
                         </div>
                     ))
                 ) : (
-                    displayDeals.map((deal) => {
+                    deals.map((deal) => {
                         const discountBadge = deal.discount || calculateDiscount(deal.price, deal.discountPrice);
 
                         return (

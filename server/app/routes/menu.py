@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Response
+from fastapi.responses import RedirectResponse
 from fastapi.concurrency import run_in_threadpool 
 from sqlalchemy.orm import Session, defer
 from sqlalchemy import text
@@ -15,6 +16,7 @@ from app.models.menu import MenuItem
 from app.models.user import Restaurant
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, ConfigDict, Field
+from app.utils.cloudinary_utils import upload_image_to_cloudinary
 
 # --- CONFIG ---
 load_dotenv() 
@@ -24,21 +26,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 router = APIRouter()
 
-# --- HELPER: Compress Image ---
+# --- HELPER: Upload / Compress Image ---
 def compress_image(image_file: UploadFile, max_size=(800, 800), quality=70) -> str:
-    try:
-        img = Image.open(image_file.file)
-        if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")
-        img.thumbnail(max_size)
-        buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=quality, optimize=True)
-        buffer.seek(0)
-        encoded = base64.b64encode(buffer.read()).decode("utf-8")
-        return f"data:image/jpeg;base64,{encoded}"
-    except Exception as e:
-        print(f"Error compressing image: {e}")
-        return None
+    return upload_image_to_cloudinary(image_file, folder="crave_menu", max_size=max_size, quality=quality)
 
 # --- DEPENDENCY ---
 def get_current_restaurant(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
@@ -66,15 +56,14 @@ class MenuItemLite(BaseModel):
     is_veg: bool = True
     is_available: bool = Field(True, serialization_alias="isAvailable")
     
-    # --- NEW: Include addons in the response ---
+    # Include addons and image in the response
     addons: Optional[str] = "[]"
+    image: Optional[str] = None
     
-    # NO IMAGE (Speed Optimization)
     model_config = ConfigDict(from_attributes=True)
 
 class MenuItemFull(MenuItemLite):
-    # Full model including image for detail views
-    image: Optional[str] = None
+    pass
 
 # ======================= ROUTES =======================
 
@@ -88,13 +77,12 @@ def get_public_menu(restaurant_id: int, db: Session = Depends(get_db)):
 # 2. GET Single Item Details (Needed for FoodItemDetails page)
 @router.get("/api/public/menu/item/{item_id}", response_model=MenuItemFull)
 def get_single_menu_item(item_id: int, db: Session = Depends(get_db)):
-    # Here we DO want the image, so we don't defer it
     item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     return item
 
-# 3. GET Menu Item Image (Public - Lazy Load)
+# 3. GET Menu Item Image (Public - Lazy Load & Cloudinary Redirect)
 @router.get("/api/menu/image/{item_id}")
 def get_menu_item_image(item_id: int, db: Session = Depends(get_db)):
     item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
@@ -102,15 +90,34 @@ def get_menu_item_image(item_id: int, db: Session = Depends(get_db)):
     if not item or not item.image:
         return Response(status_code=404)
 
+    img_str = str(item.image).strip()
+    
+    # If image is a direct HTTP/HTTPS URL (e.g. Cloudinary)
+    if img_str.startswith("http://") or img_str.startswith("https://"):
+        return RedirectResponse(url=img_str, status_code=307)
+
     try:
-        img_str = item.image
-        if "base64," in img_str:
+        media_type = "image/jpeg"
+        if img_str.startswith("data:"):
+            header, img_str = img_str.split(",", 1)
+            if "image/png" in header:
+                media_type = "image/png"
+            elif "image/webp" in header:
+                media_type = "image/webp"
+            elif "image/gif" in header:
+                media_type = "image/gif"
+        elif "base64," in img_str:
             _, img_str = img_str.split("base64,", 1)
+
         image_data = base64.b64decode(img_str)
-        # Add Cache-Control for performance
-        return Response(content=image_data, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=31536000"})
-    except Exception:
-        return Response(status_code=500)
+        return Response(
+            content=image_data,
+            media_type=media_type,
+            headers={"Cache-Control": "public, max-age=31536000"}
+        )
+    except Exception as e:
+        print(f"[Menu Image Error for item {item_id}]: {e}")
+        return Response(status_code=404)
 
 # 4. GET My Menu (For Restaurant Dashboard - REQUIRES TOKEN)
 @router.get("/api/menu", response_model=List[MenuItemLite])

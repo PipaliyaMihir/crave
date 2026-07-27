@@ -1,0 +1,46 @@
+services:
+  # ----------------------------------------------------
+  # 1. CRAVE Backend API Service (FastAPI / Uvicorn)
+  # ----------------------------------------------------
+  - type: web
+    name: crave-backend
+    runtime: python
+    buildCommand: "cd server && pip install -r requirements.txt"
+    startCommand: "cd server && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+
+  # ----------------------------------------------------
+  # 2. CRAVE Frontend Web App (React / Vite Static Site)
+  # ----------------------------------------------------
+  - type: web
+    name: crave-frontend
+    runtime: static
+    buildCommand: "cd client && npm install && npm run build"
+    staticPublishPath: "./client/dist"
+    routes:
+      - type: rewrite
+        source: "/*"
+        destination: "/index.html"
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false

@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE_URL } from '../services/api';
 
 const Chatbot = () => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const [isCartModalOpen, setIsCartModalOpen] = useState(false); // 👈 New State
+  const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { text: "Hi Jay! Welcome to CRAVE. Ready to order something delicious? 🍕", sender: "bot" }
+    { text: "Hi! Welcome to CRAVE. Ready to order something delicious? 🍕", sender: "bot" }
   ]);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -17,9 +19,8 @@ const Chatbot = () => {
   // --- 1. LISTEN FOR THE CART POP-UP ---
   useEffect(() => {
     const handleCartToggle = (e) => {
-      // e.detail will be true if cart is open, false if closed
       setIsCartModalOpen(e.detail);
-      if (e.detail) setIsOpen(false); // Automatically close chat window if cart opens
+      if (e.detail) setIsOpen(false);
     };
 
     window.addEventListener('crave:cartToggle', handleCartToggle);
@@ -30,7 +31,6 @@ const Chatbot = () => {
   const hiddenPaths = ['/admin', '/restaurant', '/rider'];
   const isPathHidden = hiddenPaths.some(path => location.pathname.startsWith(path));
   
-  // Hide if on restricted path OR if the Cart Modal is open
   const isHidden = isPathHidden || isCartModalOpen; 
 
   // --- 3. ADD TO CART LOGIC ---
@@ -42,7 +42,7 @@ const Chatbot = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/cart/add', {
+      const response = await fetch(`${API_BASE_URL}/api/cart/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -100,7 +100,7 @@ const Chatbot = () => {
     const currentUserId = storedUserId ? parseInt(storedUserId, 10) : null;
 
     try {
-      const response = await fetch('http://localhost:8000/api/chat', {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMessage, user_id: currentUserId }),

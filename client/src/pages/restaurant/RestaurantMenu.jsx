@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Plus, X, Image as ImageIcon, Leaf, Drumstick, Edit, Trash2, UploadCloud, Eye, EyeOff, Loader2, ListPlus } from "lucide-react";
 import { useToast } from "../../context/useToast";
+import { API_BASE_URL } from "../../services/api";
 
 // --- HELPER: Updated with Cache Busting ---
 const getImageUrl = (item) => {
@@ -13,7 +14,7 @@ const getImageUrl = (item) => {
     if (item.image && (item.image.startsWith("data:") || item.image.startsWith("http"))) return item.image;
     
     // API URL with timestamp to force browser to refresh the image
-    return `http://localhost:8000/api/menu/image/${item.id}?t=${new Date().getTime()}`;
+    return `${API_BASE_URL}/api/menu/image/${item.id}?t=${new Date().getTime()}`;
 };
 
 const DEFAULT_CATEGORIES = [
@@ -59,8 +60,8 @@ const RestaurantMenu = ({ searchQuery }) => {
             
             // Fetch categories and menu in parallel
             const [catRes, menuRes] = await Promise.all([
-                fetch("http://localhost:8000/api/categories", { headers }).catch(() => null),
-                fetch("http://localhost:8000/api/menu", { headers })
+                fetch(`${API_BASE_URL}/api/categories`, { headers }).catch(() => null),
+                fetch(`${API_BASE_URL}/api/menu`, { headers })
             ]);
 
             if (catRes && catRes.ok) setDbCategories(await catRes.json());
@@ -160,7 +161,7 @@ const RestaurantMenu = ({ searchQuery }) => {
         const formData = new FormData();
         
         Object.keys(newItem).forEach(key => {
-            if (key === 'addons') formData.append(key, JSON.stringify(newItem[key]));
+            if (key === 'addons') formData.append(key, JSON.stringify(newItem.addons));
             else if (key === 'image') { if (newItem.image) formData.append(key, newItem.image); }
             else if (key === 'isAvailable') formData.append(key, newItem.isAvailable.toString());
             else if (newItem[key] !== null && newItem[key] !== "") formData.append(key, newItem[key]);
@@ -169,7 +170,7 @@ const RestaurantMenu = ({ searchQuery }) => {
         if (restaurantId) formData.append("restaurant_id", restaurantId);
 
         try {
-            const url = isEditing ? `http://localhost:8000/api/menu/${editId}` : "http://localhost:8000/api/menu";
+            const url = isEditing ? `${API_BASE_URL}/api/menu/${editId}` : `${API_BASE_URL}/api/menu`;
             const method = isEditing ? "PUT" : "POST";
             const response = await fetch(url, { method, headers, body: formData });
             
@@ -190,7 +191,7 @@ const RestaurantMenu = ({ searchQuery }) => {
         if (!window.confirm("Permanently delete this dish?")) return;
         const { headers } = getAuthData();
         try {
-            const response = await fetch(`http://localhost:8000/api/menu/${id}`, { method: "DELETE", headers });
+            const response = await fetch(`${API_BASE_URL}/api/menu/${id}`, { method: "DELETE", headers });
             if (response.ok) {
                 setMenuItems(prev => prev.filter(item => item.id !== id));
                 addToast("Item deleted", "success");
@@ -207,7 +208,7 @@ const RestaurantMenu = ({ searchQuery }) => {
         formData.append("isAvailable", updatedStatus.toString());
         
         try {
-            await fetch(`http://localhost:8000/api/menu/${item.id}`, { method: "PUT", headers, body: formData });
+            await fetch(`${API_BASE_URL}/api/menu/${item.id}`, { method: "PUT", headers, body: formData });
         } catch (e) { addToast("Status sync failed", "error"); }
     };
 
