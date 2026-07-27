@@ -30,7 +30,7 @@ chat_session = None
 gemini_key = os.getenv("GEMINI_API_KEY")
 if gemini_key:
     try:
-        from google import genai
+        import google.genai as genai
         from google.genai import types
         client = genai.Client(api_key=gemini_key)
         chat_session = client.chats.create(
