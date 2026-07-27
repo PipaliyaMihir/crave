@@ -6,16 +6,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Get the Database URL from .env
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+# Get the Database URL from .env with SQLite fallback
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sql_app.db")
 
-# --- UPDATE THIS SECTION ---
+# SQLAlchemy 2.0 / PostgreSQL compatibility fix
+if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# Handle SQLite vs PostgreSQL engine arguments
+connect_args = {}
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
+
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, 
-    # Add this line to automatically reconnect if the connection drops
-    pool_pre_ping=True  
+    SQLALCHEMY_DATABASE_URL,
+    connect_args=connect_args,
+    pool_pre_ping=True
 )
-# ---------------------------
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

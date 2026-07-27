@@ -28,17 +28,21 @@ import re
 from google import genai
 from google.genai import types
 
-# 1. Initialize the client (it reads from your .env automatically)
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
-# 2. Re-create the chat session so your endpoint can use it!
-# We use 1.5-flash here because it has the massive 1,500 requests/day free quota
-chat_session = client.chats.create(
-    model="gemini-2.5-flash", 
-    config=types.GenerateContentConfig(
-        system_instruction="You are the official CRAVE food delivery AI assistant. You are helpful, polite, and concise."
-    )
-)
+# 1. Initialize Gemini AI Client safely
+client = None
+chat_session = None
+gemini_key = os.getenv("GEMINI_API_KEY")
+if gemini_key:
+    try:
+        client = genai.Client(api_key=gemini_key)
+        chat_session = client.chats.create(
+            model="gemini-2.5-flash",
+            config=types.GenerateContentConfig(
+                system_instruction="You are the official CRAVE food delivery AI assistant. You are helpful, polite, and concise."
+            )
+        )
+    except Exception as err:
+        print(f"Warning: Gemini AI client initialization skipped: {err}")
 
 # 2. INTERNAL DB & MODEL IMPORTS
 from app.db.session import engine, Base, get_db
@@ -88,7 +92,7 @@ app = FastAPI(title="Crave API")
 # --- CORS CONFIGURATION ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173","http://127.0.0.1:5173", "http://localhost:8000"], 
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
