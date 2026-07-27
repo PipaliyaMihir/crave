@@ -34,9 +34,9 @@ if gemini_key:
         from google.genai import types
         client = genai.Client(api_key=gemini_key)
         chat_session = client.chats.create(
-            model="gemini-2.5-flash",
+            model="gemini-2.0-flash",
             config=types.GenerateContentConfig(
-                system_instruction="You are the official CRAVE food delivery AI assistant. You are helpful, polite, and concise."
+                system_instruction="You are the official CRAVE food delivery AI assistant. You answer questions strictly about CRAVE food delivery, menu items, restaurants, and food recommendations. Recommend food items and products available on CRAVE whenever relevant. If asked about unrelated subjects, politely guide the user back to CRAVE food ordering."
             )
         )
     except Exception as err:
@@ -102,6 +102,14 @@ Base.metadata.create_all(bind=engine)
 app.include_router(restaurant.router)
 app.include_router(admin.router)
 app.include_router(menu.router)
+
+@app.get("/")
+def read_root():
+    return {"status": "ok", "message": "CRAVE Backend API is live!"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
 
 
 # ---------------- HELPERS ----------------
