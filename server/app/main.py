@@ -87,6 +87,12 @@ from app.routes.admin import send_update_email
 from app.routes import restaurant, admin, menu
 from app.utils.email import send_admin_reply_email, send_auto_acknowledgment
 
+import bcrypt
+if not hasattr(bcrypt, "__about__"):
+    class _BcryptAbout:
+        __version__ = getattr(bcrypt, "__version__", "4.0.1")
+    bcrypt.__about__ = _BcryptAbout()
+
 SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key_here")
 ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
