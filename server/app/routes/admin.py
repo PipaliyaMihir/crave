@@ -449,12 +449,35 @@ def get_password_hash(password):
 def _send_email_core(to_email, subject, body, image_base64=None):
     sender_email = os.getenv("MAIL_USERNAME") or os.getenv("SENDER_EMAIL")
     sender_password = os.getenv("MAIL_PASSWORD") or os.getenv("SENDER_PASSWORD")
-    resend_api_key = os.getenv("RESEND_API_KEY")
     brevo_api_key = os.getenv("BREVO_API_KEY")
+    resend_api_key = os.getenv("RESEND_API_KEY")
 
     print(f"📧 [Email System] Triggered for target: {to_email}")
 
-    # 1. Try Resend HTTP API (Port 443 HTTPS - Unblocked on Render)
+    # 1. Brevo (Sendinblue) HTTP API (Priority 1 - Port 443 HTTPS)
+    if brevo_api_key:
+        from_email = sender_email or "no-reply@crave.com"
+        try:
+            resp = httpx.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={"api-key": brevo_api_key, "Content-Type": "application/json", "accept": "application/json"},
+                json={
+                    "sender": {"name": "Crave Support", "email": from_email},
+                    "to": [{"email": to_email}],
+                    "subject": subject,
+                    "htmlContent": body
+                },
+                timeout=15.0
+            )
+            if resp.status_code in [200, 201]:
+                print(f"✅ [Email System] Delivered via Brevo HTTPS API to {to_email}")
+                return
+            else:
+                print(f"⚠️ [Email System] Brevo API returned status {resp.status_code}: {resp.text}")
+        except Exception as b_err:
+            print(f"⚠️ [Email System] Brevo HTTPS API failed: {b_err}")
+
+    # 2. Resend HTTP API (Port 443 HTTPS - Fallback)
     if resend_api_key:
         try:
             resp = httpx.post(
@@ -476,32 +499,9 @@ def _send_email_core(to_email, subject, body, image_base64=None):
         except Exception as r_err:
             print(f"⚠️ [Email System] Resend HTTPS API failed: {r_err}")
 
-    # 2. Try Brevo (Sendinblue) HTTP API (Port 443 HTTPS - Unblocked on Render)
-    if brevo_api_key and sender_email:
-        try:
-            resp = httpx.post(
-                "https://api.brevo.com/v3/smtp/email",
-                headers={"api-key": brevo_api_key, "Content-Type": "application/json"},
-                json={
-                    "sender": {"name": "Crave Support", "email": sender_email},
-                    "to": [{"email": to_email}],
-                    "subject": subject,
-                    "htmlContent": body
-                },
-                timeout=15.0
-            )
-            if resp.status_code in [200, 201]:
-                print(f"✅ [Email System] Delivered via Brevo HTTPS API to {to_email}")
-                return
-            else:
-                print(f"⚠️ [Email System] Brevo API returned status {resp.status_code}: {resp.text}")
-        except Exception as b_err:
-            print(f"⚠️ [Email System] Brevo HTTPS API failed: {b_err}")
-
     # 3. Fallback to Standard SMTP
     if not sender_email or not sender_password:
-        print(f"⚠️ [Email System] SKIPPED! Missing MAIL_USERNAME / SENDER_EMAIL or MAIL_PASSWORD / SENDER_PASSWORD in Render Environment Variables.")
-        print("💡 TIP: Add RESEND_API_KEY in Render to send emails via HTTP API (Port 443) which is never blocked by cloud firewalls!")
+        print(f"⚠️ [Email System] SKIPPED! Missing BREVO_API_KEY, RESEND_API_KEY, or SENDER_EMAIL in Render Environment Variables.")
         return
 
     print(f"📧 [Email System] Attempting SMTP via sender: {sender_email} to: {to_email}")
