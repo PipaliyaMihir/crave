@@ -265,6 +265,7 @@ def read_root():
 def health_check():
     return {"status": "healthy"}
 
+@app.get("/db-status")
 @app.get("/api/db-status")
 def get_db_status(db: Session = Depends(get_db)):
     try:
