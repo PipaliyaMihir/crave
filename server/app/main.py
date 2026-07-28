@@ -117,20 +117,24 @@ def seed_initial_data(force=False):
     try:
         # 1. Admin account seed
         admin_user = db.query(User).filter(User.role == "admin").first()
-        if not admin_user or force:
-            hashed_pw = pwd_context.hash("admin123")
-            if not admin_user:
-                new_admin = User(
-                    username="admin",
-                    full_name="System Admin",
-                    email="admin@crave.com",
-                    phone="0000000000",
-                    hashed_password=hashed_pw,
-                    role="admin"
-                )
-                db.add(new_admin)
-                db.commit()
+        hashed_pw = pwd_context.hash("admin123")
+        if not admin_user:
+            new_admin = User(
+                username="admin",
+                full_name="System Admin",
+                email="admin@crave.com",
+                phone="0000000000",
+                hashed_password=hashed_pw,
+                role="admin"
+            )
+            db.add(new_admin)
+            db.commit()
             print("[DB Seed] Default admin created: username=admin, password=admin123")
+        elif force and admin_user:
+            admin_user.username = "admin"
+            admin_user.hashed_password = hashed_pw
+            db.commit()
+            print("[DB Seed] Admin password updated: username=admin, password=admin123")
 
         # 2. Sample Restaurants and Menu Items seed
         if db.query(Restaurant).count() == 0 or force:
@@ -192,29 +196,39 @@ def seed_initial_data(force=False):
 
             for r_data in sample_restaurants:
                 items_data = r_data.pop("items")
-                res = Restaurant(**r_data)
-                db.add(res)
-                db.commit()
-                db.refresh(res)
+                res = db.query(Restaurant).filter(Restaurant.email == r_data["email"]).first()
+                if not res:
+                    res = Restaurant(**r_data)
+                    db.add(res)
+                    db.commit()
+                    db.refresh(res)
 
                 # Create matching user account for restaurant login
                 res_user = db.query(User).filter(User.email == res.email).first()
+                res_username = res.name.lower().replace(" ", "").replace("'", "")
+                res_pw_hash = pwd_context.hash("restaurant123")
                 if not res_user:
                     user_obj = User(
-                        username=res.name.lower().replace(" ", "").replace("'", ""),
+                        username=res_username,
                         full_name=res.name,
                         email=res.email,
                         phone="0000000000",
-                        hashed_password=pwd_context.hash("restaurant123"),
+                        hashed_password=res_pw_hash,
                         role="restaurant"
                     )
                     db.add(user_obj)
                     db.commit()
+                elif force and res_user:
+                    res_user.username = res_username
+                    res_user.hashed_password = res_pw_hash
+                    db.commit()
 
                 # Add menu items
                 for item in items_data:
-                    m_item = MenuItem(restaurant_id=res.id, **item)
-                    db.add(m_item)
+                    existing_item = db.query(MenuItem).filter(MenuItem.restaurant_id == res.id, MenuItem.name == item["name"]).first()
+                    if not existing_item:
+                        m_item = MenuItem(restaurant_id=res.id, **item)
+                        db.add(m_item)
                 db.commit()
 
             print("[DB Seed] Sample restaurants and menu items successfully seeded!")
