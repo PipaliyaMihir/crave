@@ -478,7 +478,7 @@ def _send_email_core(to_email, subject, body, image_base64=None):
 
     # 1. Brevo (Sendinblue) HTTP API (Priority 1 - Port 443 HTTPS)
     if brevo_api_key:
-        from_email = sender_email or "no-reply@crave.com"
+        from_email = sender_email or "mppipalia29@gmail.com"
         try:
             resp = httpx.post(
                 "https://api.brevo.com/v3/smtp/email",
@@ -492,7 +492,7 @@ def _send_email_core(to_email, subject, body, image_base64=None):
                 timeout=15.0
             )
             if resp.status_code in [200, 201]:
-                print(f"✅ [Email System] Delivered via Brevo HTTPS API to {to_email}")
+                print(f"✅ [Email System] Delivered via Brevo HTTPS API to {to_email} (Sender: {from_email}) | Response: {resp.text}")
                 return
             else:
                 print(f"⚠️ [Email System] Brevo API returned status {resp.status_code}: {resp.text}")
