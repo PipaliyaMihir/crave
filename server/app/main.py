@@ -50,7 +50,7 @@ if gemini_key:
         print(f"Warning: Gemini AI client initialization skipped: {err}")
 
 # 2. INTERNAL DB & MODEL IMPORTS
-from app.db.session import engine, Base, get_db
+from app.db.session import engine, Base, get_db, SessionLocal
 from app.models.user import User, Restaurant, Favorite
 from app.models.menu import MenuItem 
 from app.models.cart import Cart 
