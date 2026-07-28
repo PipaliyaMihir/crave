@@ -227,6 +227,36 @@ def read_root():
 def health_check():
     return {"status": "healthy"}
 
+@app.get("/api/seed")
+@app.get("/api/admin/seed-database")
+def trigger_seed_database():
+    seed_initial_data(force=True)
+    return {
+        "status": "success",
+        "message": "Database seeded successfully with Admin account (username: admin, password: admin123), 4 Restaurants, and full Menus!"
+    }
+
+class CreateAdminRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+
+@app.post("/api/admin/create-admin")
+def create_admin_manually(req: CreateAdminRequest, db: Session = Depends(get_db)):
+    existing = db.query(User).filter((User.username == req.username) | (User.email == req.email)).first()
+    if existing:
+        raise HTTPException(400, "Username or email already exists")
+    hashed_pw = pwd_context.hash(req.password)
+    new_admin = User(
+        username=req.username,
+        email=req.email,
+        hashed_password=hashed_pw,
+        role="admin"
+    )
+    db.add(new_admin)
+    db.commit()
+    return {"status": "success", "message": f"Admin '{req.username}' created successfully!"}
+
 
 # ---------------- HELPERS ----------------
 def verify_password(plain, hashed): return pwd_context.verify(plain, hashed)
