@@ -372,6 +372,7 @@
 
 import os
 import smtplib
+import ssl
 import base64
 from typing import Optional, List
 from email.mime.text import MIMEText
@@ -473,20 +474,26 @@ def _send_email_core(to_email, subject, body, image_base64=None):
         except Exception: pass
 
     try:
+        context = ssl.create_default_context()
         try:
-            server = smtplib.SMTP("smtp.gmail.com", 587, timeout=15)
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.sendmail(sender_email, to_email, msg.as_string())
-            server.quit()
-            print(f"✅ [Email System] Sent via SMTP port 587 to {to_email}")
-        except Exception as smtp_err:
-            print(f"⚠️ [Email System] Port 587 failed ({smtp_err}), trying SSL port 465...")
-            server = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15)
+            # Try Port 465 (SSL) first - works reliably on Render / Cloud platforms
+            server = smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context, timeout=15)
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, to_email, msg.as_string())
             server.quit()
             print(f"✅ [Email System] Sent via SMTP_SSL port 465 to {to_email}")
+        except Exception as ssl_err:
+            print(f"⚠️ [Email System] Port 465 failed ({ssl_err}), trying TLS port 587...")
+            server = smtplib.SMTP("smtp.gmail.com", 587, timeout=15)
+            server.starttls(context=context)
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, to_email, msg.as_string())
+            server.quit()
+            print(f"✅ [Email System] Sent via SMTP port 587 to {to_email}")
+            
+        if sender_email.lower() == to_email.lower():
+            print(f"💡 [Note] Email sent from {sender_email} to ITSELF ({to_email}). In Gmail, check your 'Sent' or 'All Mail' folder!")
+
     except Exception as e:
         print(f"❌ [Email System] FAILED to send email to {to_email}: {e}")
 
