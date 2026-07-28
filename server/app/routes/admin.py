@@ -444,12 +444,13 @@ def get_password_hash(password):
     return pwd_context.hash(password)
 
 # --- CORE EMAIL ENGINE ---
+# --- CORE EMAIL ENGINE ---
 def _send_email_core(to_email, subject, body, image_base64=None):
-    sender_email = os.getenv("MAIL_USERNAME")
-    sender_password = os.getenv("MAIL_PASSWORD")
+    sender_email = os.getenv("MAIL_USERNAME") or os.getenv("SENDER_EMAIL")
+    sender_password = os.getenv("MAIL_PASSWORD") or os.getenv("SENDER_PASSWORD")
 
     if not sender_email or not sender_password:
-        print("⚠️ Skipped Email: Missing Credentials in .env")
+        print(f"⚠️ Skipped Email to {to_email}: Missing MAIL_USERNAME / SENDER_EMAIL or MAIL_PASSWORD / SENDER_PASSWORD in environment variables")
         return
 
     msg = MIMEMultipart("related")
@@ -475,9 +476,9 @@ def _send_email_core(to_email, subject, body, image_base64=None):
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, to_email, msg.as_string())
         server.quit()
-        print(f"✅ Email sent to {to_email}")
+        print(f"✅ Email sent successfully to {to_email}")
     except Exception as e:
-        print(f"❌ Email Failed: {e}")
+        print(f"❌ Email Failed to {to_email}: {e}")
 
 # --- SPECIFIC EMAIL TEMPLATES ---
 
@@ -595,7 +596,6 @@ def approve_restaurant(request_id: int, background_tasks: BackgroundTasks, db: S
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-        background_tasks.add_task(send_login_email, req.email, generated_username, temp_password)
     else:
         generated_username = existing_user.username
 
@@ -604,6 +604,7 @@ def approve_restaurant(request_id: int, background_tasks: BackgroundTasks, db: S
     
     req.status = "approved"
     db.commit()
+    background_tasks.add_task(send_login_email, req.email, generated_username, temp_password)
     return {"message": "Restaurant approved", "username": generated_username}
 
 @router.post("/rider-approve/{request_id}")

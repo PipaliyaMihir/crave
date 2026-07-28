@@ -224,8 +224,7 @@ def seed_initial_data(force=False):
     finally:
         db.close()
 
-# Automatic startup seeding disabled to keep your custom database 100% untouched
-# seed_initial_data()
+seed_initial_data()
 
 app.include_router(restaurant.router)
 app.include_router(admin.router)
