@@ -314,9 +314,14 @@ class CreateAdminRequest(BaseModel):
 def create_admin_manually(req: CreateAdminRequest, db: Session = Depends(get_db)):
     try:
         existing = db.query(User).filter((User.username == req.username) | (User.email == req.email)).first()
-        if existing:
-            raise HTTPException(400, "Username or email already exists")
         hashed_pw = pwd_context.hash(req.password)
+        if existing:
+            existing.username = req.username
+            existing.hashed_password = hashed_pw
+            existing.role = "admin"
+            db.commit()
+            return {"status": "success", "message": f"Admin '{req.username}' password updated successfully!"}
+
         new_admin = User(
             username=req.username,
             full_name=req.full_name or req.username,
