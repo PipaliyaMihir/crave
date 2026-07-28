@@ -444,14 +444,16 @@ def get_password_hash(password):
     return pwd_context.hash(password)
 
 # --- CORE EMAIL ENGINE ---
-# --- CORE EMAIL ENGINE ---
 def _send_email_core(to_email, subject, body, image_base64=None):
     sender_email = os.getenv("MAIL_USERNAME") or os.getenv("SENDER_EMAIL")
     sender_password = os.getenv("MAIL_PASSWORD") or os.getenv("SENDER_PASSWORD")
 
+    print(f"📧 [Email System] Triggered for target: {to_email}")
     if not sender_email or not sender_password:
-        print(f"⚠️ Skipped Email to {to_email}: Missing MAIL_USERNAME / SENDER_EMAIL or MAIL_PASSWORD / SENDER_PASSWORD in environment variables")
+        print(f"⚠️ [Email System] SKIPPED! Missing MAIL_USERNAME / SENDER_EMAIL or MAIL_PASSWORD / SENDER_PASSWORD in Render Environment Variables.")
         return
+
+    print(f"📧 [Email System] Sending via sender: {sender_email} to: {to_email}")
 
     msg = MIMEMultipart("related")
     msg["From"] = f"Crave Support <{sender_email}>"
@@ -477,14 +479,16 @@ def _send_email_core(to_email, subject, body, image_base64=None):
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, to_email, msg.as_string())
             server.quit()
+            print(f"✅ [Email System] Sent via SMTP port 587 to {to_email}")
         except Exception as smtp_err:
+            print(f"⚠️ [Email System] Port 587 failed ({smtp_err}), trying SSL port 465...")
             server = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15)
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, to_email, msg.as_string())
             server.quit()
-        print(f"✅ Email sent successfully to {to_email}")
+            print(f"✅ [Email System] Sent via SMTP_SSL port 465 to {to_email}")
     except Exception as e:
-        print(f"❌ Email Failed to {to_email}: {e}")
+        print(f"❌ [Email System] FAILED to send email to {to_email}: {e}")
 
 # --- SPECIFIC EMAIL TEMPLATES ---
 
