@@ -265,6 +265,28 @@ def read_root():
 def health_check():
     return {"status": "healthy"}
 
+@app.get("/api/db-status")
+def get_db_status(db: Session = Depends(get_db)):
+    try:
+        users = db.query(User.id, User.username, User.email, User.role).all()
+        user_list = [{"id": u.id, "username": u.username, "email": u.email, "role": u.role} for u in users]
+        db_type = engine.name
+        db_url_str = str(engine.url)
+        if "@" in db_url_str:
+            db_target = db_url_str.split("@")[-1]
+        else:
+            db_target = db_url_str
+            
+        return {
+            "status": "connected",
+            "db_type": db_type,
+            "db_target": db_target,
+            "total_users": len(user_list),
+            "users": user_list
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.get("/api/seed")
 @app.get("/api/admin/seed-database")
 def trigger_seed_database():
