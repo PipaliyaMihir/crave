@@ -471,11 +471,17 @@ def _send_email_core(to_email, subject, body, image_base64=None):
         except Exception: pass
 
     try:
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, to_email, msg.as_string())
-        server.quit()
+        try:
+            server = smtplib.SMTP("smtp.gmail.com", 587, timeout=15)
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, to_email, msg.as_string())
+            server.quit()
+        except Exception as smtp_err:
+            server = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15)
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, to_email, msg.as_string())
+            server.quit()
         print(f"✅ Email sent successfully to {to_email}")
     except Exception as e:
         print(f"❌ Email Failed to {to_email}: {e}")

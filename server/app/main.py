@@ -1472,35 +1472,33 @@ def delete_restaurant(restaurant_id: int, db: Session = Depends(get_db)):
         if not restaurant:
             raise HTTPException(status_code=404, detail="Restaurant not found")
 
-        # 2. CLEAR CART ITEMS referencing this restaurant's menu items
+        # 2. CLEAR CART & FAVORITES referencing this restaurant's menu items
         menu_items = db.query(MenuItem).filter(MenuItem.restaurant_id == restaurant_id).all()
         menu_item_ids = [m.id for m in menu_items]
         if menu_item_ids:
             db.query(Cart).filter(Cart.menu_item_id.in_(menu_item_ids)).delete(synchronize_session=False)
+            db.query(Favorite).filter(Favorite.menu_item_id.in_(menu_item_ids)).delete(synchronize_session=False)
 
-        # 3. CLEAR FAVORITES
-        db.query(Favorite).filter(Favorite.restaurant_id == restaurant_id).delete(synchronize_session=False)
-
-        # 4. CLEAR MENU ITEMS
+        # 3. CLEAR MENU ITEMS
         db.query(MenuItem).filter(MenuItem.restaurant_id == restaurant_id).delete(synchronize_session=False)
 
-        # 5. CLEAR RESTAURANT ORDERS & ORDER ITEMS
+        # 4. CLEAR RESTAURANT ORDERS & ORDER ITEMS
         orders = db.query(Order).filter(Order.restaurant_id == restaurant_id).all()
         order_ids = [o.id for o in orders]
         if order_ids:
             db.query(OrderItem).filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
             db.query(Order).filter(Order.id.in_(order_ids)).delete(synchronize_session=False)
 
-        # 6. CLEAR RESTAURANT REQUESTS
+        # 5. CLEAR RESTAURANT REQUESTS
         if restaurant.email:
             db.query(RestaurantRequest).filter(RestaurantRequest.email == restaurant.email).delete(synchronize_session=False)
 
-        # 7. HANDLE THE USER
+        # 6. HANDLE THE USER
         user = db.query(User).filter(User.email == restaurant.email).first()
         if user:
             user.role = "customer"
 
-        # 8. Delete the restaurant itself
+        # 7. Delete the restaurant itself
         db.delete(restaurant)
         db.commit()
         
