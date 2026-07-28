@@ -1472,31 +1472,34 @@ def delete_restaurant(restaurant_id: int, db: Session = Depends(get_db)):
         if not restaurant:
             raise HTTPException(status_code=404, detail="Restaurant not found")
 
-        # 2. CLEAR MENU ITEMS
+        # 2. CLEAR FAVORITES
+        db.query(Favorite).filter(Favorite.restaurant_id == restaurant_id).delete(synchronize_session=False)
+
+        # 3. CLEAR MENU ITEMS
         db.query(MenuItem).filter(MenuItem.restaurant_id == restaurant_id).delete(synchronize_session=False)
 
-        # 3. CLEAR RESTAURANT ORDERS 
-        # (Prevents the inevitable 'orders_restaurant_id_fkey' crash)
-        # Note: In a real-world app, you might "soft-delete" these or keep them for accounting, 
-        # but to actually delete the restaurant, they must go.
-        db.query(Order).filter(Order.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        # 4. CLEAR RESTAURANT ORDERS & ORDER ITEMS
+        orders = db.query(Order).filter(Order.restaurant_id == restaurant_id).all()
+        order_ids = [o.id for o in orders]
+        if order_ids:
+            db.query(OrderItem).filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
+            db.query(Order).filter(Order.id.in_(order_ids)).delete(synchronize_session=False)
 
-        # 4. HANDLE THE USER (Fixes your current crash)
+        # 5. HANDLE THE USER
         user = db.query(User).filter(User.email == restaurant.email).first()
         if user:
-            # Downgrade them to a customer instead of deleting them.
-            # This preserves their personal order history and prevents the crash.
             user.role = "customer"
-            # NOTE: We are NOT calling db.delete(user) anymore!
 
-        # 5. Delete the restaurant itself
+        # 6. Delete the restaurant itself
         db.delete(restaurant)
         db.commit()
         
         return {"message": "Restaurant and associated data deleted successfully"}
         
+    except HTTPException:
+        raise
     except Exception as e:
-        db.rollback() # Undo the transaction if it fails
+        db.rollback()
         print(f"❌ Deletion Error: {e}") 
         raise HTTPException(status_code=500, detail=str(e))
 

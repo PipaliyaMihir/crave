@@ -1,4 +1,4 @@
-﻿# import os
+# import os
 # import smtplib
 # import base64
 # from typing import Optional, List
@@ -481,7 +481,10 @@ def _send_email_core(to_email, subject, body, image_base64=None):
 
 # --- SPECIFIC EMAIL TEMPLATES ---
 
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://crave-jbjv.onrender.com")
+
 def send_login_email(to_email: str, username: str, password: str):
+    login_url = f"{FRONTEND_URL}/login"
     subject = "Welcome to the Crave Family! 🍽️"
     body = f"""
     <html>
@@ -492,13 +495,14 @@ def send_login_email(to_email: str, username: str, password: str):
             <p><strong>Username:</strong> {username}</p>
             <p><strong>Password:</strong> {password}</p>
         </div>
-        <p><a href="http://localhost:5173/login">Login here</a></p>
+        <p><a href="{login_url}">Click here to Login</a></p>
     </body>
     </html>
     """
     _send_email_core(to_email, subject, body)
 
 def send_rider_welcome_email(to_email: str, username: str, password: str):
+    login_url = f"{FRONTEND_URL}/login"
     subject = "Welcome to the Crave Fleet! 🚴‍♂️"
     body = f"""
     <html>
@@ -509,7 +513,7 @@ def send_rider_welcome_email(to_email: str, username: str, password: str):
             <p><strong>Username:</strong> {username}</p>
             <p><strong>Password:</strong> {password}</p>
         </div>
-        <p><a href="http://localhost:5173/login">Login to start earning</a></p>
+        <p><a href="{login_url}">Click here to Login to start earning</a></p>
     </body>
     </html>
     """
