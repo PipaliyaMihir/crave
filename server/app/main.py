@@ -12,7 +12,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, defer, load_only
-from sqlalchemy import func 
+from sqlalchemy import func, or_
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
@@ -1136,12 +1136,23 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/login", response_model=TokenResponse)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == form_data.username).options(defer(User.profile_image)).first()
-    if not user or not verify_password(form_data.password, user.hashed_password): raise HTTPException(401, "Invalid credentials")
+    # 1. Search by Username OR Email
+    user = db.query(User).filter(or_(User.username == form_data.username, User.email == form_data.username)).options(defer(User.profile_image)).first()
+    
+    # 2. Auto-seed if database is completely empty
+    if not user and db.query(User).count() == 0:
+        print("[Auto-Seed] Empty Database detected during login attempt! Auto-seeding initial admin and restaurants...")
+        seed_initial_data(force=True)
+        user = db.query(User).filter(or_(User.username == form_data.username, User.email == form_data.username)).options(defer(User.profile_image)).first()
+
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(401, "Invalid credentials")
+
     restaurant_id = None
     if user.role == "restaurant":
         res = db.query(Restaurant).filter(Restaurant.email == user.email).first()
         if res: restaurant_id = res.id
+
     token = jwt.encode({"sub": user.username, "id": user.id, "role": user.role, "restaurant_id": restaurant_id, "exp": datetime.now(timezone.utc) + timedelta(hours=2)}, SECRET_KEY, algorithm=ALGORITHM)
     return {"access_token": token, "token_type": "bearer", "role": user.role, "username": user.username, "user_id": user.id, "restaurant_id": restaurant_id}
 
