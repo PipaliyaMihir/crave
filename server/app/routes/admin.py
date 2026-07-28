@@ -449,10 +449,32 @@ def get_password_hash(password):
 def _send_email_core(to_email, subject, body, image_base64=None):
     sender_email = os.getenv("MAIL_USERNAME") or os.getenv("SENDER_EMAIL")
     sender_password = os.getenv("MAIL_PASSWORD") or os.getenv("SENDER_PASSWORD")
+    gmail_webhook_url = os.getenv("GMAIL_WEBHOOK_URL")
     brevo_api_key = os.getenv("BREVO_API_KEY")
     resend_api_key = os.getenv("RESEND_API_KEY")
 
     print(f"📧 [Email System] Triggered for target: {to_email}")
+
+    # 1. Google Apps Script Native Gmail Webhook Bridge (100% Free, Uses your own Gmail natively over HTTPS!)
+    if gmail_webhook_url:
+        try:
+            resp = httpx.post(
+                gmail_webhook_url,
+                json={
+                    "to": to_email,
+                    "subject": subject,
+                    "body": body
+                },
+                follow_redirects=True,
+                timeout=15.0
+            )
+            if resp.status_code in [200, 201]:
+                print(f"✅ [Email System] Delivered via Google Apps Script Webhook to {to_email}")
+                return
+            else:
+                print(f"⚠️ [Email System] Google Webhook returned status {resp.status_code}: {resp.text}")
+        except Exception as g_err:
+            print(f"⚠️ [Email System] Google Webhook failed: {g_err}")
 
     # 1. Brevo (Sendinblue) HTTP API (Priority 1 - Port 443 HTTPS)
     if brevo_api_key:
