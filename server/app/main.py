@@ -106,25 +106,28 @@ app.add_middleware(
 # Initialize Database Tables
 Base.metadata.create_all(bind=engine)
 
-def seed_initial_data():
+def seed_initial_data(force=False):
     db = SessionLocal()
     try:
         # 1. Admin account seed
         admin_user = db.query(User).filter(User.role == "admin").first()
-        if not admin_user:
+        if not admin_user or force:
             hashed_pw = pwd_context.hash("admin123")
-            new_admin = User(
-                username="admin",
-                email="admin@crave.com",
-                hashed_password=hashed_pw,
-                role="admin"
-            )
-            db.add(new_admin)
-            db.commit()
+            if not admin_user:
+                new_admin = User(
+                    username="admin",
+                    full_name="System Admin",
+                    email="admin@crave.com",
+                    phone="0000000000",
+                    hashed_password=hashed_pw,
+                    role="admin"
+                )
+                db.add(new_admin)
+                db.commit()
             print("[DB Seed] Default admin created: username=admin, password=admin123")
 
         # 2. Sample Restaurants and Menu Items seed
-        if db.query(Restaurant).count() == 0:
+        if db.query(Restaurant).count() == 0 or force:
             sample_restaurants = [
                 {
                     "name": "McDonald's London",
@@ -193,7 +196,9 @@ def seed_initial_data():
                 if not res_user:
                     user_obj = User(
                         username=res.name.lower().replace(" ", "").replace("'", ""),
+                        full_name=res.name,
                         email=res.email,
+                        phone="0000000000",
                         hashed_password=pwd_context.hash("restaurant123"),
                         role="restaurant"
                     )
@@ -240,22 +245,32 @@ class CreateAdminRequest(BaseModel):
     username: str
     email: str
     password: str
+    full_name: Optional[str] = "Admin User"
+    phone: Optional[str] = "0000000000"
 
 @app.post("/api/admin/create-admin")
 def create_admin_manually(req: CreateAdminRequest, db: Session = Depends(get_db)):
-    existing = db.query(User).filter((User.username == req.username) | (User.email == req.email)).first()
-    if existing:
-        raise HTTPException(400, "Username or email already exists")
-    hashed_pw = pwd_context.hash(req.password)
-    new_admin = User(
-        username=req.username,
-        email=req.email,
-        hashed_password=hashed_pw,
-        role="admin"
-    )
-    db.add(new_admin)
-    db.commit()
-    return {"status": "success", "message": f"Admin '{req.username}' created successfully!"}
+    try:
+        existing = db.query(User).filter((User.username == req.username) | (User.email == req.email)).first()
+        if existing:
+            raise HTTPException(400, "Username or email already exists")
+        hashed_pw = pwd_context.hash(req.password)
+        new_admin = User(
+            username=req.username,
+            full_name=req.full_name or req.username,
+            email=req.email,
+            phone=req.phone or "0000000000",
+            hashed_password=hashed_pw,
+            role="admin"
+        )
+        db.add(new_admin)
+        db.commit()
+        return {"status": "success", "message": f"Admin '{req.username}' created successfully!"}
+    except HTTPException:
+        raise
+    except Exception as err:
+        db.rollback()
+        raise HTTPException(500, f"Failed to create admin: {str(err)}")
 
 
 # ---------------- HELPERS ----------------
