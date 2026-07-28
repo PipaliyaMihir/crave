@@ -195,23 +195,34 @@ def seed_initial_data(force=False):
             ]
 
             for r_data in sample_restaurants:
-                items_data = r_data.pop("items")
-                res = db.query(Restaurant).filter(Restaurant.email == r_data["email"]).first()
+                items_data = r_data.get("items", [])
+                res_email = r_data["email"]
+                res_name = r_data["name"]
+
+                res = db.query(Restaurant).filter(Restaurant.email == res_email).first()
                 if not res:
-                    res = Restaurant(**r_data)
+                    res = Restaurant(
+                        name=res_name,
+                        email=res_email,
+                        address=r_data["address"],
+                        is_active=r_data["is_active"],
+                        profile_image=r_data["profile_image"],
+                        average_rating=r_data["average_rating"],
+                        rating_count=r_data["rating_count"]
+                    )
                     db.add(res)
                     db.commit()
                     db.refresh(res)
 
                 # Create matching user account for restaurant login
-                res_user = db.query(User).filter(User.email == res.email).first()
-                res_username = res.name.lower().replace(" ", "").replace("'", "")
+                res_user = db.query(User).filter(User.email == res_email).first()
+                res_username = res_name.lower().replace(" ", "").replace("'", "")
                 res_pw_hash = pwd_context.hash("restaurant123")
                 if not res_user:
                     user_obj = User(
                         username=res_username,
-                        full_name=res.name,
-                        email=res.email,
+                        full_name=res_name,
+                        email=res_email,
                         phone="0000000000",
                         hashed_password=res_pw_hash,
                         role="restaurant"
@@ -224,17 +235,19 @@ def seed_initial_data(force=False):
                     db.commit()
 
                 # Add menu items
-                for item in items_data:
-                    existing_item = db.query(MenuItem).filter(MenuItem.restaurant_id == res.id, MenuItem.name == item["name"]).first()
-                    if not existing_item:
-                        m_item = MenuItem(restaurant_id=res.id, **item)
-                        db.add(m_item)
-                db.commit()
+                if res and res.id:
+                    for item in items_data:
+                        existing_item = db.query(MenuItem).filter(MenuItem.restaurant_id == res.id, MenuItem.name == item["name"]).first()
+                        if not existing_item:
+                            m_item = MenuItem(restaurant_id=res.id, **item)
+                            db.add(m_item)
+                    db.commit()
 
             print("[DB Seed] Sample restaurants and menu items successfully seeded!")
     except Exception as e:
         print(f"[DB Seed Error]: {e}")
         db.rollback()
+        raise e
     finally:
         db.close()
 
@@ -255,11 +268,17 @@ def health_check():
 @app.get("/api/seed")
 @app.get("/api/admin/seed-database")
 def trigger_seed_database():
-    seed_initial_data(force=True)
-    return {
-        "status": "success",
-        "message": "Database seeded successfully with Admin account (username: admin, password: admin123), 4 Restaurants, and full Menus!"
-    }
+    try:
+        seed_initial_data(force=True)
+        return {
+            "status": "success",
+            "message": "Database seeded successfully with Admin account (username: admin, password: admin123), 4 Restaurants, and full Menus!"
+        }
+    except Exception as err:
+        return {
+            "status": "error",
+            "message": f"Database seed completed with warning: {err}"
+        }
 
 class CreateAdminRequest(BaseModel):
     username: str
