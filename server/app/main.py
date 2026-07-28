@@ -106,9 +106,10 @@ app.add_middleware(
 # Initialize Database Tables
 Base.metadata.create_all(bind=engine)
 
-def seed_default_admin():
+def seed_initial_data():
     db = SessionLocal()
     try:
+        # 1. Admin account seed
         admin_user = db.query(User).filter(User.role == "admin").first()
         if not admin_user:
             hashed_pw = pwd_context.hash("admin123")
@@ -121,13 +122,98 @@ def seed_default_admin():
             db.add(new_admin)
             db.commit()
             print("[DB Seed] Default admin created: username=admin, password=admin123")
+
+        # 2. Sample Restaurants and Menu Items seed
+        if db.query(Restaurant).count() == 0:
+            sample_restaurants = [
+                {
+                    "name": "McDonald's London",
+                    "email": "mcdonalds@crave.com",
+                    "address": "Oxford Street, London",
+                    "is_active": True,
+                    "profile_image": "https://upload.wikimedia.org/wikipedia/commons/4/4b/McDonald%27s_logo.svg",
+                    "average_rating": 4.8,
+                    "rating_count": 124,
+                    "items": [
+                        {"name": "Big Mac Burger", "price": 199.0, "discount_price": 169.0, "category": "Burgers", "description": "Classic double beef patty with special sauce.", "image": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80"},
+                        {"name": "McFlurry Oreo", "price": 129.0, "discount_price": 99.0, "category": "Desserts", "description": "Creamy soft serve blended with crunchy Oreo cookies.", "image": "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=800&q=80"},
+                        {"name": "Crispy French Fries", "price": 99.0, "discount_price": 79.0, "category": "Sides", "description": "Golden salted crispy potato fries.", "image": "https://images.unsplash.com/photo-1576107232684-1279f390859f?auto=format&fit=crop&w=800&q=80"}
+                    ]
+                },
+                {
+                    "name": "Papa John's Pizza",
+                    "email": "papajohns@crave.com",
+                    "address": "Baker Street, London",
+                    "is_active": True,
+                    "profile_image": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Papa_Johns_logo.svg/500px-Papa_Johns_logo.svg.png",
+                    "average_rating": 4.7,
+                    "rating_count": 98,
+                    "items": [
+                        {"name": "Pepperoni Feast Pizza", "price": 399.0, "discount_price": 349.0, "category": "Pizza", "description": "Loaded with mozzarella cheese and spicy pepperoni slices.", "image": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80"},
+                        {"name": "Garlic Cheese Sticks", "price": 179.0, "discount_price": 149.0, "category": "Sides", "description": "Freshly baked dough topped with garlic butter and melted cheese.", "image": "https://images.unsplash.com/photo-1541745537411-b8046dc6d66c?auto=format&fit=crop&w=800&q=80"}
+                    ]
+                },
+                {
+                    "name": "KFC Crispy Chicken",
+                    "email": "kfc@crave.com",
+                    "address": "Piccadilly Circus, London",
+                    "is_active": True,
+                    "profile_image": "https://upload.wikimedia.org/wikipedia/sco/b/bf/KFC_logo.svg",
+                    "average_rating": 4.6,
+                    "rating_count": 85,
+                    "items": [
+                        {"name": "6 Pc Zinger Chicken Bucket", "price": 499.0, "discount_price": 429.0, "category": "Buckets", "description": "Extra crunchy spicy fried chicken pieces.", "image": "https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?auto=format&fit=crop&w=800&q=80"},
+                        {"name": "Zinger Chicken Burger", "price": 189.0, "discount_price": 159.0, "category": "Burgers", "description": "Crispy chicken fillet in sesame seed bun.", "image": "https://images.unsplash.com/photo-1615557960916-5f4791effe9d?auto=format&fit=crop&w=800&q=80"}
+                    ]
+                },
+                {
+                    "name": "South Indian Dosa Corner",
+                    "email": "southindian@crave.com",
+                    "address": "High Street, London",
+                    "is_active": True,
+                    "profile_image": "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?auto=format&fit=crop&w=800&q=80",
+                    "average_rating": 4.9,
+                    "rating_count": 140,
+                    "items": [
+                        {"name": "Sada Paper Dosa", "price": 120.0, "discount_price": 100.0, "category": "South Indian", "description": "This is delicious Paper Dosa served with coconut chutney & sambar.", "image": "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?auto=format&fit=crop&w=800&q=80"},
+                        {"name": "Masala Dosa", "price": 150.0, "discount_price": 130.0, "category": "South Indian", "description": "Crispy dosa stuffed with spiced potato masala.", "image": "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80"}
+                    ]
+                }
+            ]
+
+            for r_data in sample_restaurants:
+                items_data = r_data.pop("items")
+                res = Restaurant(**r_data)
+                db.add(res)
+                db.commit()
+                db.refresh(res)
+
+                # Create matching user account for restaurant login
+                res_user = db.query(User).filter(User.email == res.email).first()
+                if not res_user:
+                    user_obj = User(
+                        username=res.name.lower().replace(" ", "").replace("'", ""),
+                        email=res.email,
+                        hashed_password=pwd_context.hash("restaurant123"),
+                        role="restaurant"
+                    )
+                    db.add(user_obj)
+                    db.commit()
+
+                # Add menu items
+                for item in items_data:
+                    m_item = MenuItem(restaurant_id=res.id, **item)
+                    db.add(m_item)
+                db.commit()
+
+            print("[DB Seed] Sample restaurants and menu items successfully seeded!")
     except Exception as e:
         print(f"[DB Seed Error]: {e}")
         db.rollback()
     finally:
         db.close()
 
-seed_default_admin()
+seed_initial_data()
 
 app.include_router(restaurant.router)
 app.include_router(admin.router)
